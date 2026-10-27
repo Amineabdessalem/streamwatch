@@ -81,8 +81,8 @@ class IsolationForest:
 class StreamingIsolationForest:
     """Scores each point using the `shingle` most recent values as its feature vector."""
 
-    def __init__(self, shingle: int = 8, reference: int = 256, refit_every: int = 64,
-                 threshold: float = 0.65, n_trees: int = 50, seed: int | None = 0):
+    def __init__(self, shingle: int = 4, reference: int = 256, refit_every: int = 64,
+                 threshold: float = 0.67, n_trees: int = 50, seed: int | None = 0):
         self.shingle = shingle
         self.reference = reference
         self.refit_every = refit_every
@@ -94,13 +94,19 @@ class StreamingIsolationForest:
         self._fitted = False
         self._n = 0
 
+    @staticmethod
+    def _features(window: np.ndarray) -> np.ndarray:
+        # Level-free shape features so slow drift does not look anomalous:
+        # step-to-step changes plus the newest point's distance from the window mean.
+        return np.append(np.diff(window), window[-1] - window[:-1].mean())
+
     def update(self, x: float) -> Detection:
         idx = self._n
         self._n += 1
         self._recent.append(x)
         if len(self._recent) < self.shingle:
             return Detection(idx, x, 0.0, False)
-        vec = np.array(self._recent)
+        vec = self._features(np.array(self._recent))
         score = float(self.forest.score(vec)[0]) if self._fitted else 0.0
         anomaly = self._fitted and score > self.threshold
         if not anomaly:
