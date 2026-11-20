@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections import deque
 from dataclasses import dataclass
+from statistics import median
 
 
 @dataclass(frozen=True)
@@ -91,4 +92,41 @@ class EWMADetector:
             a = self.alpha
             self._mean += a * diff
             self._var = (1 - a) * (self._var + a * diff * diff)
+        return Detection(idx, x, score, anomaly)
+
+
+class RobustZScoreDetector:
+    """Flags points far from the window median, scaled by the median absolute deviation (MAD).
+
+    Unlike the mean/std detector, a few outliers in the window barely move the median or the MAD,
+    so they cannot hide the next spike. The MAD is scaled by 1.4826 so it matches a standard
+    deviation for normal data. Each update sorts the window, so it is O(w log w) per point.
+    """
+
+    _MAD_SCALE = 1.4826
+
+    def __init__(self, window: int = 50, threshold: float = 3.5, warmup: int | None = None) -> None:
+        if window < 3:
+            raise ValueError("window must be >= 3")
+        self.window = window
+        self.threshold = threshold
+        self.warmup = warmup if warmup is not None else min(window, 10)
+        self._buf: deque[float] = deque(maxlen=window)
+        self._n = 0
+
+    def update(self, x: float) -> Detection:
+        idx = self._n
+        self._n += 1
+        if len(self._buf) < self.warmup:
+            self._buf.append(x)
+            return Detection(idx, x, 0.0, False)
+        med = median(self._buf)
+        mad = median(abs(v - med) for v in self._buf) * self._MAD_SCALE
+        if mad > 1e-12:
+            score = abs(x - med) / mad
+        else:
+            score = 0.0 if x == med else math.inf
+        anomaly = score > self.threshold
+        if not anomaly:
+            self._buf.append(x)
         return Detection(idx, x, score, anomaly)
