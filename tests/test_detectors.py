@@ -79,3 +79,21 @@ def test_robust_detector_rejects_tiny_windows():
 
     with _pytest.raises(ValueError):
         RobustZScoreDetector(window=2)
+
+
+def test_cusum_catches_a_sustained_mean_shift():
+    from streamwatch import CusumDetector
+
+    rng = random.Random(3)
+    det = CusumDetector(drift=0.5, threshold=5.0, warmup=30)
+    base = [det.update(rng.gauss(0.0, 1.0)).is_anomaly for _ in range(300)]
+    assert sum(base) <= 3
+    shifted = [det.update(rng.gauss(2.0, 1.0)).is_anomaly for _ in range(40)]
+    assert any(shifted)
+
+
+def test_cusum_rejects_bad_parameters():
+    from streamwatch import CusumDetector
+
+    with pytest.raises(ValueError):
+        CusumDetector(threshold=0)

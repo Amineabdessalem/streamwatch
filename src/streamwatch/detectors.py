@@ -130,3 +130,44 @@ class RobustZScoreDetector:
         if not anomaly:
             self._buf.append(x)
         return Detection(idx, x, score, anomaly)
+
+
+class CusumDetector:
+    """Two-sided CUSUM for sustained mean shifts. Flags when the cumulative drift exceeds `threshold`.
+
+    `drift` is the slack per step (roughly half the shift you want to catch, in standard deviations).
+    Warmup estimates mean and std from the first points; after a flag the sums reset.
+    """
+
+    def __init__(self, drift: float = 0.5, threshold: float = 5.0, warmup: int = 30) -> None:
+        if drift < 0 or threshold <= 0 or warmup < 2:
+            raise ValueError("need drift >= 0, threshold > 0, warmup >= 2")
+        self.drift = drift
+        self.threshold = threshold
+        self.warmup = warmup
+        self._head: list[float] = []
+        self._mean = 0.0
+        self._std = 1.0
+        self._pos = 0.0
+        self._neg = 0.0
+        self._n = 0
+
+    def update(self, x: float) -> Detection:
+        idx = self._n
+        self._n += 1
+        if len(self._head) < self.warmup:
+            self._head.append(x)
+            if len(self._head) == self.warmup:
+                self._mean = sum(self._head) / self.warmup
+                var = sum((v - self._mean) ** 2 for v in self._head) / (self.warmup - 1)
+                self._std = math.sqrt(var) if var > 1e-12 else 1.0
+            return Detection(idx, x, 0.0, False)
+        z = (x - self._mean) / self._std
+        self._pos = max(0.0, self._pos + z - self.drift)
+        self._neg = max(0.0, self._neg - z - self.drift)
+        score = max(self._pos, self._neg)
+        anomaly = score > self.threshold
+        if anomaly:
+            self._pos = 0.0
+            self._neg = 0.0
+        return Detection(idx, x, score, anomaly)

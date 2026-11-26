@@ -1,9 +1,16 @@
 """streamwatch: streaming time-series anomaly detection."""
 
-from streamwatch.detectors import Detection, EWMADetector, RobustZScoreDetector, RollingZScoreDetector
+from streamwatch.detectors import (
+    CusumDetector,
+    Detection,
+    EWMADetector,
+    RobustZScoreDetector,
+    RollingZScoreDetector,
+)
 from streamwatch.iforest import IsolationForest, StreamingIsolationForest
 
 __all__ = [
+    "CusumDetector",
     "Detection",
     "EWMADetector",
     "IsolationForest",
