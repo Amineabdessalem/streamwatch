@@ -171,3 +171,30 @@ class CusumDetector:
             self._pos = 0.0
             self._neg = 0.0
         return Detection(idx, x, score, anomaly)
+
+
+class EnsembleDetector:
+    """Runs several detectors on each point and flags when enough of them agree.
+
+    Each member's score is divided by its own threshold, so 1.0 means "at threshold" for every
+    member and the scores are comparable. The ensemble flags when at least `min_votes` members
+    flag the point. Its score is the mean of the normalised member scores.
+    """
+
+    def __init__(self, members: list, min_votes: int = 2) -> None:
+        if not members:
+            raise ValueError("need at least one member detector")
+        if not 1 <= min_votes <= len(members):
+            raise ValueError("min_votes must be between 1 and the number of members")
+        self.members = list(members)
+        self.min_votes = min_votes
+        self._n = 0
+
+    def update(self, x: float) -> Detection:
+        idx = self._n
+        self._n += 1
+        results = [m.update(x) for m in self.members]
+        normalised = [r.score / m.threshold for r, m in zip(results, self.members)]
+        votes = sum(r.is_anomaly for r in results)
+        score = sum(normalised) / len(normalised)
+        return Detection(idx, x, score, votes >= self.min_votes)

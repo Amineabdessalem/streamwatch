@@ -97,3 +97,29 @@ def test_cusum_rejects_bad_parameters():
 
     with pytest.raises(ValueError):
         CusumDetector(threshold=0)
+
+
+def test_ensemble_flags_only_when_enough_members_agree():
+    from streamwatch import (
+        EnsembleDetector,
+        RobustZScoreDetector,
+        RollingZScoreDetector,
+    )
+
+    rng = random.Random(11)
+    ens = EnsembleDetector(
+        [RobustZScoreDetector(window=40, threshold=3.5), RollingZScoreDetector(window=40, threshold=3.0)],
+        min_votes=2,
+    )
+    flags = [ens.update(rng.gauss(0.0, 1.0)).is_anomaly for _ in range(200)]
+    assert sum(flags) <= 3
+    assert ens.update(40.0).is_anomaly
+
+
+def test_ensemble_rejects_bad_configuration():
+    from streamwatch import EnsembleDetector, RollingZScoreDetector
+
+    with pytest.raises(ValueError):
+        EnsembleDetector([])
+    with pytest.raises(ValueError):
+        EnsembleDetector([RollingZScoreDetector()], min_votes=2)

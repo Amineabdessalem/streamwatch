@@ -3,6 +3,7 @@
 from streamwatch.detectors import (
     CusumDetector,
     Detection,
+    EnsembleDetector,
     EWMADetector,
     RobustZScoreDetector,
     RollingZScoreDetector,
@@ -13,6 +14,7 @@ __all__ = [
     "CusumDetector",
     "Detection",
     "EWMADetector",
+    "EnsembleDetector",
     "IsolationForest",
     "RobustZScoreDetector",
     "RollingZScoreDetector",
